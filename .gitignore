@@ -1,0 +1,14 @@
+wsl-kernel/
+
+driver/*.o
+driver/*.ko
+driver/*.cmd
+driver/*.mod
+driver/*.mod.c
+driver/Module.symvers
+driver/modules.order
+
+userspace/ramdisk_test
+
+driver/*_backup.c
+driver/virtual_ramdisk_before_*.c
