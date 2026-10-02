@@ -96,6 +96,7 @@ static int virtual_ramdisk_crypt_sector(void *buf, sector_t sector, bool encrypt
     			}
 
                 	memcpy(ramdisk_data + current_offset, crypto_buf, VRD_BLOCK_SIZE);
+
             	}
             	else {
                 	memcpy(crypto_buf, ramdisk_data + current_offset, VRD_BLOCK_SIZE);
