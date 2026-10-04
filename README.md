@@ -1,163 +1,55 @@
-# In-Memory Encrypted Virtual RAM-Disk Block Driver
+## In-Memory Encrypted Virtual RAM-Disk Block Driver
 
 ## 1. Project Overview
 
-This project implements a Linux-based virtual block device that provides
-16 MB of RAM-backed storage.
+It is a small virtual RAM disk based on Linux which has been implemented as a block device driver.
+The driver creates a 16 MB storage area in RAM and exposes it as:
+/dev/virtual_ramdisk
+Upon writing data to the device, the driver encrypts each 512-byte block with AES-XTS and then stores it in RAM; when the data is subsequently read, the driver decrypts it and forwards the original data to the user-space program.
+The program written in C++17 is used to test the device and to verify that the data written to the RAM disk can be read back correctly.
 
-The virtual disk is implemented as a Linux block device driver. Data written
-to the virtual disk is encrypted using AES-XTS before being stored in RAM.
-When data is read, it is decrypted by the driver and returned to the user.
+## 2. Main Objectives
 
-A C++ user-space application is used to interact with and test the virtual
-RAM disk.
+- Make a Linux virtual block device.
+Use the RAM for temporary storage rather than the physical disk.
+- Deal with read and write requests at the block level.
+- Before data is stored in RAM it should be encrypted.
+- When reading the data, decrypt it.
+- Use the AES-XTS function of the Linux Kernel Crypto API.
+Check the device with a C++17 application.
+- Check both single-block and multiple-block operations.
 
-## 2. Objectives
+## 3. Explanation of how the project works
 
-- Implement a Linux virtual block device.
-- Store disk data in RAM instead of physical storage.
-- Implement block-level read and write operations.
-- Encrypt data before storing it in RAM.
-- Decrypt data during read operations.
-- Provide a C++ application for testing the device.
-- Demonstrate interaction between user-space software and a Linux kernel driver.
-- Test data integrity using single-block and multiple-block operations.
+The project has two main parts:
+User Space
+The C++ test program opens /dev/virtual_ramdisk and uses the usual read() and write() system calls.
+Kernel Space
+The Linux block layer and blk-mq pass on the block requests to the Linux kernel driver; and for a write request it takes the data, encrypts it, and then stores the encrypted block in the RAM-backed storage.
+When handling a read request, it takes the encrypted block from RAM, decrypts it, and then returns the decrypted data.
+Data Flow
+Write:
+C++ application → /dev/virtual_ramdisk → blk-mq → driver → AES-XTS encryption → RAM
+Read:
+RAM → AES-XTS decryption → driver → /dev/virtual_ramdisk → C++ application
 
-## 3. System Architecture
+## 4. Technology Used
 
-The project follows a user-space to kernel-space architecture.
-
-```text
-+-------------------------------+
-| C++ User-Space Test App       |
-| ramdisk_test.cpp              |
-+---------------+---------------+
-                |
-                | read() / write()
-                v
-+-------------------------------+
-| Linux Virtual Block Device    |
-| /dev/virtual_ramdisk          |
-+---------------+---------------+
-                |
-                v
-+-------------------------------+
-| Linux Kernel Block Driver     |
-| virtual_ramdisk.c             |
-+---------------+---------------+
-                |
-                v
-+-------------------------------+
-| AES-XTS Encryption Layer      |
-+---------------+---------------+
-                |
-                v
-+-------------------------------+
-| In-Memory Storage             |
-| 16 MB RAM                     |
-+-------------------------------+
-
-Write path:
-User data → Block Driver → AES-XTS Encryption → RAM
-
-Read path:
-RAM → AES-XTS Decryption → Block Driver → User application
-
-### Main Components
-
-1. **Linux Kernel Driver**
-   - Creates the virtual block device.
-   - Handles block read/write requests.
-   - Manages the RAM-backed storage.
-
-2. **Encryption Layer**
-   - Uses the Linux Kernel Crypto API.
-   - Uses AES-XTS for block-level encryption.
-   - Encrypts data before it is stored in RAM.
-   - Decrypts data before returning it to the user.
-
-3. **C++ User-Space Application**
-   - Opens `/dev/virtual_ramdisk`.
-   - Performs read/write operations.
-   - Tests single-block and multiple-block data integrity.
-
-4. **RAM Storage**
-   - Provides 16 MB temporary storage.
-   - Data exists only while the driver is loaded.
-
-## 4. Requirements
-
-### Software Requirements
-
-- Linux environment
-- WSL2 with Ubuntu
-- Custom WSL2 kernel with required block-device and crypto support
-- GCC
-- G++
+- Linux / WSL2
+- Linux Kernel
+- Linux block-device driver
+- blk-mq
+- C
+- C++17
+- Linux Kernel Crypto API
+- AES-XTS
 - GNU Make
-- Git
+- Git / GitHub
+- x86-64 architecture
+The kernel driver is written in C since the code for the Linux kernel and device drivers makes use of the kernel's C interfaces, and the user-space test program is written in C++17.
 
-### Hardware/Architecture Concepts
+## 5. Project Structure
 
-- RAM-backed storage
-- Block device architecture
-- Kernel-space and user-space interaction
-- System calls
-- Linux block I/O
-- Memory management
-- Data encryption
-
-## 5. Build and Run
-
-### Build the Kernel Module
-
-```bash
-cd ~/projects/virtual-ramdisk-driver/driver
-make
-
-### Verify the Virtual Disk
-
-```bash
-lsblk | grep virtual_ramdisk
-
-### Build the C++ Test Application
-
-```bash
-cd ~/projects/virtual-ramdisk-driver/userspace
-g++ -std=c++17 -Wall -Wextra ramdisk_test.cpp -o ramdisk_test
-
-## 6. Testing and Results
-
-### Test 1: Virtual Disk Detection
-
-The Linux system successfully detects the 16 MB virtual RAM disk.
-
-### Test 2: Single-Block Read/Write
-
-- Block size: 512 bytes
-- Write operation: PASS
-- Read operation: PASS
-- Data integrity: PASS
-
-### Test 3: Multiple-Block Read/Write
-
-- Multiple-block test: PASS
-- Data was successfully written and read back.
-
-### Test 4: Encryption and Decryption
-
-- AES-XTS encryption: PASS
-- Encrypted data is stored in RAM.
-- Data is decrypted during read operations.
-- Original plaintext was successfully recovered after read-back.
-
-### Test Result
-
-All implemented functional tests completed successfully.
-
-## 7. Project Structure
-
-```text
 virtual-ramdisk-driver/
 ├── driver/
 │   ├── virtual_ramdisk.c
@@ -165,34 +57,123 @@ virtual-ramdisk-driver/
 ├── userspace/
 │   └── ramdisk_test.cpp
 ├── docs/
+│   ├── development_plan.md
+│   ├── requirements.md
+│   └── test_plan.md
 ├── diagrams/
-├── tests/
-├── scripts/
+│   ├── architecture.md
+│   ├── class_diagram.md
+│   └── sequence_diagram.md
 ├── README.md
 └── .gitignore
 
-## 8. Limitations
+## 6. Requirements
 
-- The virtual disk provides temporary storage in RAM.
-- Data is lost when the driver is unloaded or the system is restarted.
-- The encryption key is generated when the driver is initialized and is not persisted.
-- AES-XTS provides confidentiality but does not provide authentication or tamper detection.
-- The current implementation is intended as an educational prototype
+The project needs a Linux environment with:
+- Linux / WSL2
+- A kernel development environment
+- Required block-device and crypto support
+- GCC
+- G++
+- GNU Make
+- Git
+The development environment makes use of a custom WSL2 kernel.
 
-## 9. Future Improvements
+## 7. Build and Run
 
-- Add a user-space control interface using ioctl.
-- Add configurable RAM disk size.
-- Improve concurrent request handling.
-- Add more extensive automated testing.
-- Add performance benchmarking.
-- Improve key-management options.
-- Add detailed monitoring and statistics.
+Step 1: Build the kernel module
+cd ~/projects/virtual-ramdisk-driver/driver
+make
+This should generate:
+virtual_ramdisk.ko
+Step 2: Load the driver
+sudo insmod ./virtual_ramdisk.ko
+Step 3: Check the virtual disk
+lsblk | grep virtual_ramdisk
+The device must appear as a block device of 16 MB.
+You can also check the device file:
+ls -l /dev/virtual_ramdisk
+Step 4: Build the C++ test program
+cd ~/projects/virtual-ramdisk-driver/userspace
+g++ -std=c++17 -Wall -Wextra ramdisk_test.cpp -o ramdisk_test
+Step 5: Run the test
+sudo ./ramdisk_test
 
-## 10. Conclusion
+## 8. Testing
 
-The project demonstrates the implementation of a Linux RAM-backed virtual block device with
-AES-XTS encryption and a C++ user-space test application.
+The current test program checks:
+Single-block test
+A 512-byte block is written to the virtual disk and then read back; the data returned is compared with the data that was written.
+Multiple-block test
+The program consisting of the test writes four blocks of data and then reads them back; memcmp() is used to check that the data has not changed after the complete journey.
+The current test output is:
+The virtual RAM disk has been successfully opened.
+Write successful: 512 bytes
+Read successful: 512 bytes
+Data: C++_RAMDISK_TEST
 
-It combines Linux device-driver concepts, block I/O, memory management, system programming,
-computer architecture concepts, and data security in a single working prototype.
+Running multiple-block test...
+Multiple-block test: PASS
+The test plan for the project also includes the successful compilation of the module, the loading of the driver, the creation of the virtual device, testing with a single block, testing with multiple blocks, and traversal of the encryption/decryption path.
+
+## 9. Encryption
+
+The driver makes use of the Linux Kernel Crypto API with AES-XTS.
+When the module is initialized a 64-byte key is generated and, for each 512-byte sector, the sector-based value is used as the XTS tweak.
+The important part of the write path is:
+plaintext → AES-XTS encryption → encrypted data → RAM
+The read path is the reverse:
+encrypted data in RAM → AES-XTS decryption → plaintext
+The encryption key is created when the module is initialized and is not saved.
+
+## 10. Limitations
+
+This is an educational prototype, so it has some limitations:
+– The storage is volatile since the data is lost whenever the driver is unloaded or the system is restarted.
+- The encryption key is not stored.
+- AES-XTS ensures confidentiality but does not offer authenticated integrity or the ability to detect tampering.
+- The size of the storage is now set at 16 MB.
+The current setup handles requests in a simple way. It is not meant to be a storage driver for production use.
+- There is some extra time required due to encryption and the processing carried out by the kernel driver.
+
+## 11. Future Improvements
+
+Possible improvements include:
+- Configurable RAM-disk size.
+- There will be more comprehensive automated tests.
+- Performance benchmarking.
+Better handling of requests at the same time.
+- There is a control interface in user space which uses ioctl.
+- Improved key-management options.
+- Monitoring of runtime and statistics.
+
+## 12. Development Plan
+
+Over the course of the 20-day training period, the project was developed in a step-by-step manner.
+The work covered:
+1. Linux and WSL environment setup.
+2. A basic introduction to the Linux kernel and device drivers.
+3. Virtual RAM-disk implementation.
+4. blk-mq request processing.
+5. AES-XTS encryption and decryption.
+6. C++ user-space testing.
+7. Documentation and validation.
+8. Final demonstration.
+The detailed plan is available in:
+docs/development_plan.md
+
+## 13. Documentation
+
+Additional project documentation:
+- docs/requirements.md. Project requirements and scope.
+- docs/development_plan.md, 20-day development plan.
+- docs/test_plan.md. Test cases and results.
+— diagrams/architecture.md — the system architecture.
+- diagrams/class_diagram.md, component or class view.
+- diagrams/sequence_diagram.md, read and write sequence.
+
+## 14. Conclusion
+
+The project shows how a block-device driver for the Linux kernel can be used to provide temporary storage by using RAM rather than a physical disk.
+The project also illustrates the way that C++ code running in user space communicates with a driver in kernel space and shows how AES-XTS can be included in the data path before the blocks are stored in RAM.
+One project brings together Linux device-driver concepts, block I/O, memory management, C/C++ system programming, and basic data-security concepts.
